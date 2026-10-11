@@ -1,0 +1,40 @@
+databaseChangeLog:
+  - changeSet:
+      id: catalog-schema-001
+      author: julian1614
+      labels: HU-CAT-001
+      changes:
+        - sqlFile: {path: ../01_ddl/01_schemas/001_catalog.sql, relativeToChangelogFile: true}
+      rollback:
+        - sql: DROP SCHEMA catalog;
+  - changeSet:
+      id: catalog-tables-001
+      author: julian1614
+      changes:
+        - sqlFile: {path: ../01_ddl/03_tables/001_medications.sql, relativeToChangelogFile: true}
+      rollback:
+        - sql: DROP TABLE catalog.creation_request, catalog.medication;
+  - changeSet:
+      id: catalog-grants-001
+      author: julian1614
+      changes:
+        - sqlFile: {path: ../03_dcl/001_catalog.sql, relativeToChangelogFile: true}
+      rollback:
+        - sql: REVOKE catalog_writer FROM catalog_app; REVOKE ALL ON ALL TABLES IN SCHEMA catalog FROM catalog_reader, catalog_writer; REVOKE ALL ON SCHEMA catalog FROM catalog_reader, catalog_writer; DROP ROLE catalog_reader, catalog_writer;
+  - changeSet:
+      id: catalog-maintenance-002
+      author: julian1614
+      labels: HU-CAT-002
+      changes:
+        - sqlFile: {path: ../01_ddl/03_tables/002_maintenance.sql, relativeToChangelogFile: true}
+      rollback:
+        - sql:
+            splitStatements: false
+            sql: |
+              DO $$ BEGIN
+                IF EXISTS (SELECT FROM catalog.medication WHERE version > 0) THEN
+                  RAISE EXCEPTION 'Rollback forbidden: medication maintenance audit exists';
+                END IF;
+              END $$;
+              REVOKE UPDATE (code, name, active_ingredient, pharmaceutical_form, concentration, active, version, updated_at, updated_by) ON catalog.medication FROM catalog_writer;
+              ALTER TABLE catalog.medication DROP CONSTRAINT ck_medication_update_audit, DROP COLUMN version, DROP COLUMN updated_at, DROP COLUMN updated_by;
